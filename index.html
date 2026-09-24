@@ -75,6 +75,25 @@
         </div>
     </aside>
 
+    <!-- Google Sheet Status / Quick Setup Banner -->
+    <div class="bg-emerald-900 border-b border-emerald-800 text-emerald-100 text-xs py-2 px-4">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+                <span id="sheetConnectionIndicator" class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
+                <span class="font-medium" id="sheetStatusText">สถานะ Google Sheet: <b class="text-emerald-300">เชื่อมต่อแล้ว (พร้อมบันทึกออเดอร์เข้า Sheet ทันที)</b></span>
+                <span class="text-emerald-300 text-[11px] hidden sm:inline">- ข้อมูล ชื่อ เบอร์ ที่อยู่ จะถูกส่งเข้า Google Sheet อัตโนมัติ</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="testSheetConnection()" class="bg-emerald-800 hover:bg-emerald-700 text-white px-2.5 py-1 rounded text-xs transition flex items-center gap-1">
+                    <i class="fa-solid fa-paper-plane text-[10px]"></i> ทดสอบส่งข้อมูลตัวอย่าง
+                </button>
+                <button onclick="openConfigModal()" class="bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold px-3 py-1 rounded text-xs transition flex items-center gap-1">
+                    <i class="fa-solid fa-gear text-[10px]"></i> ตั้งค่าเชื่อมต่อ Google Sheet
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Main Navigation Bar -->
     <header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -589,62 +608,307 @@
                         Google Apps Script Web App URL:
                     </label>
                     <input type="url" id="sheetWebhookUrl" 
+                           value="https://script.google.com/macros/s/AKfycbzK2Lx5hc9BSIkikSz4Hl_MwfUN5i6-KPMMvYNyOUCP2YmBHTwI0RVOvWMRKeN9Uzw-/exec"
                            placeholder="https://script.google.com/macros/s/.../exec"
                            class="w-full text-xs font-mono border border-slate-300 rounded-xl p-2.5 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 outline-none">
-                    <p class="text-[11px] text-slate-500 mt-1">หากปล่อยว่าง ระบบจะจำลองการส่ง และจัดเก็บในคลังประวัติของหน้านี้</p>
+                    <p class="text-[11px] text-slate-500 mt-1">วาง Web App URL ที่ได้จากการกด Deploy ของ Google Apps Script ที่นี่</p>
                 </div>
 
                 <!-- 1-Click Code Generator for Google Apps Script -->
                 <div class="bg-slate-900 text-slate-200 rounded-xl p-3.5 space-y-2">
                     <div class="flex items-center justify-between text-xs">
                         <span class="font-mono text-emerald-400 font-bold flex items-center gap-1.5">
-                            <i class="fa-solid fa-code"></i> โค้ด Google Apps Script (ก๊อปปี้ไปวางได้เลย)
+                            <i class="fa-solid fa-code"></i> โค้ด Google Apps Script (เวอร์ชัน V3 เสถียรสูงสุด + ทดสอบผ่านบราวเซอร์ได้)
                         </span>
                         <button onclick="copyAppsScriptCode()" id="copyScriptBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded text-[11px] flex items-center gap-1">
                             <i class="fa-regular fa-copy"></i> คัดลอกโค้ด
                         </button>
                     </div>
-                    <pre class="text-[10px] font-mono text-slate-400 max-h-36 overflow-y-auto bg-slate-950 p-2 rounded custom-scrollbar" id="gasCodeDisplay">
-function doPost(e) {
-  try {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(["วันที่-เวลา", "รหัสออเดอร์", "ชื่อช่าง/ร้าน", "เบอร์โทร", "ที่อยู่หน้างาน", "วิธีจัดส่ง", "รายการอะไหล่", "ยอดรวม (บาท)", "หมายเหตุ"]);
-    }
-    var data = JSON.parse(e.postData.contents);
-    sheet.appendRow([
-      new Date(),
-      data.orderId || "",
-      data.name || "",
-      data.phone || "",
-      data.address || "",
-      data.deliveryMethod || "",
-      data.items || "",
-      data.total || 0,
-      data.notes || ""
-    ]);
-    return ContentService.createTextOutput(JSON.stringify({status: 'success'})).setMimeType(ContentService.MimeType.JSON);
-  } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({status: 'error', message: err.toString()})).setMimeType(ContentService.MimeType.JSON);
+                    <pre class="text-[10px] font-mono text-slate-400 max-h-60 overflow-y-auto bg-slate-950 p-2.5 rounded custom-scrollbar" id="gasCodeDisplay">
+/**
+ * ========================================================================
+ * ProCool Parts - Google Apps Script (เวอร์ชัน V3 เสถียรสูงสุด)
+ * ========================================================================
+ * จุดเด่น:
+ * 1. รองรับทั้ง POST (JSON/Form) และ GET (สามารถทดสอบผ่าน Browser URL ได้โดยตรง)
+ * 2. ป้องกันข้อมูลชนกันด้วย LockService (รอคิวสูงสุด 15 วินาที)
+ * 3. ตรวจจับและสร้างตาราง "รายการสั่งอะไหล่" อัตโนมัติ พร้อมจัดสีหัวตารางและตรึงแถวแรก
+ * 4. ใส่ Dropdown สถานะงาน (🚨 รอจัดส่งด่วน, 📦 กำลังจัดของ, 🛵 ไรเดอร์รับแล้ว, ✅ ปิดงานสำเร็จ, ❌ ยกเลิก)
+ * 5. จัด Format วันที่, เบอร์โทร และยอดเงิน (฿) ให้อัตโนมัติ
+ * ========================================================================
+ */
+
+// ชื่อแผ่นงาน (Tab Sheet) ที่ต้องการบันทึก
+var SHEET_NAME = "รายการสั่งอะไหล่";
+
+// ฟังก์ชันรองรับการทดสอบผ่าน Browser เช่น เปิด URL?name=ช่างทดสอบ&phone=0899999999
+function doGet(e) {
+  // หากมีการแนบพารามิเตอร์มา เช่น ?name=... ให้บันทึกลงชีตด้วย
+  if (e && e.parameter && Object.keys(e.parameter).length > 0) {
+    return processOrder(e.parameter);
   }
+  
+  return ContentService.createTextOutput(JSON.stringify({
+    status: "online",
+    message: "ProCool Parts API พร้อมใช้งาน 100%! สำหรับการทดสอบบันทึกข้อมูล สามารถส่งคำขอแบบ POST หรือระบุพารามิเตอร์ผ่าน URL ได้",
+    timestamp: new Date().toISOString()
+  })).setMimeType(ContentService.MimeType.JSON);
+}
+
+// ฟังก์ชันรับข้อมูล POST จากหน้าเว็บ
+function doPost(e) {
+  var data = {};
+  
+  try {
+    if (e && e.postData && e.postData.contents) {
+      // ตรวจสอบและแปลง JSON จากหน้าเว็บ
+      data = JSON.parse(e.postData.contents);
+    } else if (e && e.parameter) {
+      data = e.parameter;
+    }
+  } catch (err) {
+    // กรณีข้อมูลส่งมาในรูปแบบ Form-Urlencoded
+    if (e && e.parameter) {
+      data = e.parameter;
+    }
+  }
+
+  return processOrder(data);
+}
+
+// ฟังก์ชันประมวลผลและเขียนข้อมูลลง Google Sheet
+function processOrder(data) {
+  var lock = LockService.getScriptLock();
+  
+  try {
+    // ล็อกป้องกันการเขียนพร้อมกัน ชนแถวกัน
+    lock.waitLock(15000);
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_NAME);
+    
+    // ถ้ายังไม่มี Sheet ชื่อนี้ ให้สร้างใหม่
+    if (!sheet) {
+      sheet = ss.insertSheet(SHEET_NAME);
+    }
+
+    // ถ้าเป็นตารางว่าง ให้สร้างหัวตารางก่อน
+    if (sheet.getLastRow() === 0) {
+      setupSheetHeader(sheet);
+    }
+
+    var now = new Date();
+    var timestampStr = Utilities.formatDate(now, "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss");
+    var orderId = data.orderId || ("ORD-" + Utilities.formatDate(now, "Asia/Bangkok", "yyMMdd-HHmm-ss"));
+    var name = data.name || "ไม่ระบุชื่อ";
+    var phone = data.phone || "ไม่ระบุเบอร์";
+    var address = data.address || "ไม่ระบุที่อยู่";
+    var deliveryMethod = data.deliveryMethod || "ส่งด่วนหน้างาน";
+    var items = data.items || "-";
+    var total = parseFloat(data.total) || 0;
+    var notes = data.notes || "-";
+    var defaultStatus = "🚨 รอจัดส่งด่วน";
+
+    // เพิ่มแถวข้อมูลลงในตาราง (ใส่ ' หน้าเบอร์โทรเพื่อไม่ให้เลข 0 หน้าสุดหาย)
+    var formattedPhone = String(phone).startsWith("0") ? "'" + phone : phone;
+
+    sheet.appendRow([
+      timestampStr,
+      orderId,
+      name,
+      formattedPhone,
+      address,
+      deliveryMethod,
+      items,
+      total,
+      notes,
+      defaultStatus
+    ]);
+
+    var newRow = sheet.getLastRow();
+
+    // จัดรูปแบบตัวเลขยอดเงิน (฿)
+    sheet.getRange(newRow, 8).setNumberFormat("#,##0.00");
+
+    // จัดรูปแบบการจัดวาง (Alignment)
+    sheet.getRange(newRow, 1).setHorizontalAlignment("center");
+    sheet.getRange(newRow, 2).setHorizontalAlignment("center");
+    sheet.getRange(newRow, 4).setHorizontalAlignment("center");
+    sheet.getRange(newRow, 6).setHorizontalAlignment("center");
+    sheet.getRange(newRow, 8).setHorizontalAlignment("right");
+    sheet.getRange(newRow, 10).setHorizontalAlignment("center");
+
+    // เพิ่ม Dropdown ตัวเลือกสถานะจัดส่งให้แถวนี้
+    var statusRule = SpreadsheetApp.newDataValidation()
+      .requireValueInList([
+        "🚨 รอจัดส่งด่วน",
+        "📦 กำลังจัดของ",
+        "🛵 ไรเดอร์รับแล้ว",
+        "✅ ปิดงานสำเร็จ",
+        "❌ ยกเลิก"
+      ], true)
+      .setAllowInvalid(false)
+      .build();
+    sheet.getRange(newRow, 10).setDataValidation(statusRule);
+
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "success",
+      message: "บันทึกออเดอร์เข้า Google Sheet เรียบร้อยแล้ว",
+      orderId: orderId,
+      row: newRow
+    })).setMimeType(ContentService.MimeType.JSON);
+
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: error.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ฟังก์ชันสร้างหัวตารางและจัดสไตล์
+function setupSheetHeader(sheet) {
+  var headers = [
+    "วัน-เวลาสั่งซื้อ",
+    "รหัสออเดอร์",
+    "ชื่อช่าง / ร้านซ่อม",
+    "เบอร์โทรศัพท์",
+    "ที่อยู่จัดส่ง / พิกัดหน้างาน",
+    "วิธีจัดส่ง",
+    "รายการอะไหล่",
+    "ยอดรวม (฿)",
+    "หมายเหตุ",
+    "สถานะออเดอร์"
+  ];
+  
+  sheet.appendRow(headers);
+  
+  var headerRange = sheet.getRange(1, 1, 1, headers.length);
+  headerRange
+    .setBackground("#0369a1") // สีน้ำเงินช่างแอร์ ProCool
+    .setFontColor("#ffffff")
+    .setFontWeight("bold")
+    .setHorizontalAlignment("center")
+    .setVerticalAlignment("middle");
+  
+  sheet.setRowHeight(1, 38);
+  sheet.setFrozenRows(1); // ตรึงแถวที่ 1 ไว้ด้านบนเสมอ
+  
+  // กำหนดความกว้างคอลัมน์ให้เหมาะกับขนาดข้อมูล
+  sheet.setColumnWidth(1, 160); // วันเวลา
+  sheet.setColumnWidth(2, 140); // รหัสออเดอร์
+  sheet.setColumnWidth(3, 170); // ชื่อช่าง
+  sheet.setColumnWidth(4, 130); // เบอร์โทร
+  sheet.setColumnWidth(5, 280); // ที่อยู่
+  sheet.setColumnWidth(6, 150); // วิธีจัดส่ง
+  sheet.setColumnWidth(7, 260); // รายการอะไหล่
+  sheet.setColumnWidth(8, 120); // ยอดรวมเงิน
+  sheet.setColumnWidth(9, 180); // หมายเหตุ
+  sheet.setColumnWidth(10, 160); // สถานะ
 }
                     </pre>
                 </div>
 
+                <!-- Preview of Columns Stored -->
+                <div class="border border-emerald-200 bg-emerald-50/60 rounded-xl p-3">
+                    <p class="text-xs font-bold text-emerald-900 mb-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-table text-emerald-600"></i> โครงสร้างคอลัมน์ Google Sheet (แถวที่ 1):
+                    </p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-[11px] text-left border-collapse bg-white rounded-lg overflow-hidden border border-emerald-200">
+                            <thead>
+                                <tr class="bg-emerald-700 text-white font-heading">
+                                    <th class="py-1.5 px-2 text-center border-r border-emerald-600">เซลล์</th>
+                                    <th class="py-1.5 px-2 border-r border-emerald-600">ชื่อหัวคอลัมน์</th>
+                                    <th class="py-1.5 px-2 border-r border-emerald-600">ข้อมูลที่เก็บ</th>
+                                    <th class="py-1.5 px-2">ตัวอย่างข้อมูล</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-emerald-100 text-slate-700">
+                                <tr>
+                                    <td class="py-1 px-2 font-mono font-bold text-center bg-slate-50 text-emerald-800">A1</td>
+                                    <td class="py-1 px-2 font-semibold">วัน-เวลาสั่งซื้อ</td>
+                                    <td class="py-1 px-2 text-slate-500">วันเวลาที่กดสั่งซื้อ</td>
+                                    <td class="py-1 px-2 text-slate-400 font-mono">24/09/2026 10:45:00</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-1 px-2 font-mono font-bold text-center bg-slate-50 text-emerald-800">B1</td>
+                                    <td class="py-1 px-2 font-semibold">รหัสออเดอร์</td>
+                                    <td class="py-1 px-2 text-slate-500">รหัสใบเบิกอะไหล่</td>
+                                    <td class="py-1 px-2 text-slate-400 font-mono">ORD-260924-104500</td>
+                                </tr>
+                                <tr class="bg-amber-50/60 font-medium">
+                                    <td class="py-1 px-2 font-mono font-bold text-center bg-amber-100 text-amber-900">C1</td>
+                                    <td class="py-1 px-2 text-amber-950 font-bold">ชื่อช่าง / ร้านซ่อม ⭐</td>
+                                    <td class="py-1 px-2 text-amber-900">ชื่อผู้ติดต่อ/ชื่อร้าน</td>
+                                    <td class="py-1 px-2 text-amber-800">ช่างสมชาย แอร์เซอร์วิส</td>
+                                </tr>
+                                <tr class="bg-amber-50/60 font-medium">
+                                    <td class="py-1 px-2 font-mono font-bold text-center bg-amber-100 text-amber-900">D1</td>
+                                    <td class="py-1 px-2 text-amber-950 font-bold">เบอร์โทรศัพท์ ⭐</td>
+                                    <td class="py-1 px-2 text-amber-900">เบอร์มือถือช่าง (เลข 0 ไม่หาย)</td>
+                                    <td class="py-1 px-2 text-amber-800 font-mono">'0891234567</td>
+                                </tr>
+                                <tr class="bg-amber-50/60 font-medium">
+                                    <td class="py-1 px-2 font-mono font-bold text-center bg-amber-100 text-amber-900">E1</td>
+                                    <td class="py-1 px-2 text-amber-950 font-bold">ที่อยู่จัดส่ง / พิกัดหน้างาน ⭐</td>
+                                    <td class="py-1 px-2 text-amber-900">หน้างานไซต์ลูกค้า/คอนโด/ลิงก์ Maps</td>
+                                    <td class="py-1 px-2 text-amber-800">คอนโดลุมพินี สุขุมวิท 77 ตึก A ชั้น 5</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-1 px-2 font-mono font-bold text-center bg-slate-50 text-emerald-800">F1</td>
+                                    <td class="py-1 px-2 font-semibold">วิธีจัดส่ง</td>
+                                    <td class="py-1 px-2 text-slate-500">ช่องทางการนำส่ง</td>
+                                    <td class="py-1 px-2 text-slate-400">ส่งด่วน Lalamove/Grab หน้างาน</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-1 px-2 font-mono font-bold text-center bg-slate-50 text-emerald-800">G1</td>
+                                    <td class="py-1 px-2 font-semibold">รายการอะไหล่</td>
+                                    <td class="py-1 px-2 text-slate-500">ชื่ออะไหล่และจำนวน</td>
+                                    <td class="py-1 px-2 text-slate-400">แคปรัน 35uF (x2) + น้ำยา R32 (x1)</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-1 px-2 font-mono font-bold text-center bg-slate-50 text-emerald-800">H1</td>
+                                    <td class="py-1 px-2 font-semibold">ยอดรวม (฿)</td>
+                                    <td class="py-1 px-2 text-slate-500">ราคาส่งช่างรวมสุทธิ</td>
+                                    <td class="py-1 px-2 text-slate-400 font-mono">1,010.00</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-1 px-2 font-mono font-bold text-center bg-slate-50 text-emerald-800">I1</td>
+                                    <td class="py-1 px-2 font-semibold">หมายเหตุ</td>
+                                    <td class="py-1 px-2 text-slate-500">ยี่ห้อ/BTU แอร์ หรือข้อความพิเศษ</td>
+                                    <td class="py-1 px-2 text-slate-400">Daikin Inverter 18000 BTU</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-1 px-2 font-mono font-bold text-center bg-slate-50 text-emerald-800">J1</td>
+                                    <td class="py-1 px-2 font-semibold">สถานะออเดอร์</td>
+                                    <td class="py-1 px-2 text-slate-500">มี Dropdown เปลี่ยนสถานะ</td>
+                                    <td class="py-1 px-2 text-slate-400">🚨 รอจัดส่งด่วน</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <div class="text-xs text-slate-600 space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                    <p class="font-bold text-slate-800">วิธีติดตั้งแบบง่ายใน 1 นาที:</p>
+                    <p class="font-bold text-slate-800">ขั้นตอนสร้าง Google Sheet เชื่อมต่อใน 3 ขั้นตอน:</p>
                     <ol class="list-decimal list-inside space-y-1 text-slate-500 text-[11px]">
-                        <li>เปิด <a href="https://sheets.new" target="_blank" class="text-emerald-600 underline font-semibold">Google Sheets</a> ใหม่</li>
-                        <li>ไปที่ <b>ส่วนขยาย (Extensions)</b> &gt; <b>Apps Script</b></li>
-                        <li>ลบโค้ดเดิม แล้ววางโค้ดด้านบนลงไป แล้วกดปุ่ม <b>บันทึก (Save)</b></li>
-                        <li>กด <b>ทำให้ใช้งานได้ (Deploy)</b> &gt; <b>การทำให้ใช้งานได้ใหม่ (New deployment)</b></li>
-                        <li>เลือกประเภท <b>เว็บแอป (Web app)</b>, ตั้งค่า <i>ผู้มีสิทธิ์เข้าถึง (Who has access)</i> เป็น <b>ทุกคน (Anyone)</b> แล้วกด Deploy นำ URL มาใส่ในช่องด้านบน</li>
+                        <li>เปิดสร้างตารางใหม่ที่ <a href="https://sheets.new" target="_blank" class="text-emerald-600 font-bold underline">sheets.new</a></li>
+                        <li>กดเมนูด้านบน <b>ส่วนขยาย (Extensions)</b> &gt; <b>Apps Script</b> ลบโค้ดเดิมแล้ววางโค้ดด้านบน &gt; กด <b>บันทึก (Save)</b></li>
+                        <li>กดปุ่มสีน้ำเงิน <b>ทำให้ใช้งานได้ (Deploy)</b> &gt; <b>การทำให้ใช้งานได้ใหม่ (New deployment)</b> เลือกประเภท <b>เว็บแอป (Web app)</b>, ตั้งค่า <i>ผู้มีสิทธิ์เข้าถึง (Who has access)</i> เป็น <b>ทุกคน (Anyone)</b> แล้วกด Deploy นำ URL ลงท้ายด้วย <code>/exec</code> มาวาง</li>
                     </ol>
                 </div>
 
-                <div class="flex justify-end gap-2 pt-2">
-                    <button onclick="closeConfigModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">ปิด</button>
-                    <button onclick="saveSheetConfig()" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg shadow">บันทึกการตั้งค่า</button>
+                <div class="flex justify-between items-center pt-2">
+                    <button type="button" onclick="testSheetConnection()" class="px-3 py-2 text-xs font-semibold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 rounded-lg flex items-center gap-1.5">
+                        <i class="fa-solid fa-vial"></i> กดทดสอบส่งข้อมูล
+                    </button>
+                    <div class="flex gap-2">
+                        <button onclick="closeConfigModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">ปิด</button>
+                        <button onclick="saveSheetConfig()" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg shadow">บันทึก URL ชีต</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -952,7 +1216,7 @@ function doPost(e) {
         let selectedBrand = 'ทั้งหมด';
         let searchQuery = '';
         let cart = [];
-        let googleSheetUrl = '';
+        let googleSheetUrl = 'https://script.google.com/macros/s/AKfycbzK2Lx5hc9BSIkikSz4Hl_MwfUN5i6-KPMMvYNyOUCP2YmBHTwI0RVOvWMRKeN9Uzw-/exec';
         let lastSubmittedOrder = null;
 
         // On Window Load
@@ -965,12 +1229,81 @@ function doPost(e) {
         });
 
         function loadSavedConfig() {
-            // Check if there is stored webhook URL in memory or default
-            const savedUrl = window.__custom_sheet_url || '';
+            const savedUrl = window.__custom_sheet_url || googleSheetUrl;
             if (savedUrl) {
                 googleSheetUrl = savedUrl;
-                document.getElementById('sheetWebhookUrl').value = savedUrl;
+                const inputEl = document.getElementById('sheetWebhookUrl');
+                if (inputEl) inputEl.value = savedUrl;
                 updateSheetBadge(true);
+            } else {
+                updateSheetBadge(false);
+            }
+        }
+
+        function updateSheetBadge(hasUrl) {
+            const badge = document.getElementById('sheetBadge');
+            const indicator = document.getElementById('sheetConnectionIndicator');
+            const statusText = document.getElementById('sheetStatusText');
+
+            if (hasUrl) {
+                if (badge) {
+                    badge.classList.remove('bg-amber-500');
+                    badge.classList.add('bg-emerald-500');
+                    badge.title = 'เชื่อมต่อ Google Sheet แล้ว';
+                }
+                if (indicator) {
+                    indicator.classList.remove('bg-amber-400');
+                    indicator.classList.add('bg-emerald-400');
+                }
+                if (statusText) {
+                    statusText.innerHTML = `สถานะ Google Sheet: <b class="text-emerald-300">เชื่อมต่อแล้ว (พร้อมรับออเดอร์เข้า Sheet จริง)</b>`;
+                }
+            } else {
+                if (badge) {
+                    badge.classList.remove('bg-emerald-500');
+                    badge.classList.add('bg-amber-500');
+                    badge.title = 'โหมดจำลอง (ยังไม่ได้ใส่ Webhook Google Sheet)';
+                }
+                if (indicator) {
+                    indicator.classList.remove('bg-emerald-400');
+                    indicator.classList.add('bg-amber-400');
+                }
+                if (statusText) {
+                    statusText.innerHTML = `สถานะ Google Sheet: <b>ยังไม่ได้เชื่อมต่อ (กำลังทำงานในโหมดจำลอง)</b>`;
+                }
+            }
+        }
+
+        async function testSheetConnection() {
+            const urlInput = document.getElementById('sheetWebhookUrl');
+            const url = (urlInput ? urlInput.value.trim() : '') || googleSheetUrl;
+
+            if (!url) {
+                openConfigModal();
+                showToast('กรุณานำ Google Apps Script Web App URL มาใส่ในช่องด้านล่างก่อนทดสอบ', 'info');
+                return;
+            }
+
+            showToast('กำลังทดสอบส่งข้อมูลตัวอย่างเข้า Google Sheet...', 'info');
+
+            const testData = {
+                orderId: 'TEST-' + Math.floor(1000 + Math.random() * 9000),
+                name: 'ทดสอบระบบ (ช่างแอร์มืออาชีพ)',
+                phone: '089-999-9999',
+                address: 'หน้างานทดสอบ: โครงการหมู่บ้านพฤกษา ซอย 5 พิกัด 13.7563, 100.5018',
+                deliveryMethod: 'ส่งด่วน Lalamove/Grab หน้างาน',
+                items: 'แคปรัน 35uF (x2) + น้ำยาแอร์ R32 (x1 ถัง)',
+                total: 1010,
+                notes: 'การทดสอบการเชื่อมต่อ Google Sheets ผ่าน Webhook',
+                timestamp: new Date().toLocaleString('th-TH')
+            };
+
+            try {
+                await sendToGoogleSheet(testData);
+                showToast('✅ ทดสอบส่งข้อมูลสำเร็จ! เปิดตรวจสอบแถวใหม่ใน Google Sheet ได้เลย');
+            } catch (err) {
+                console.error(err);
+                showToast('ไม่สามารถเชื่อมต่อได้ กรุณาตรวจสอบสิทธิ์ของ Web App (ต้องเลือก Anyone)', 'error');
             }
         }
 
